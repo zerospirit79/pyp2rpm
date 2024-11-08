@@ -1,6 +1,6 @@
 from pyp2rpm import utils
 
-DEFAULT_TEMPLATE = 'fedora'
+DEFAULT_TEMPLATE = 'altlinux'
 DEFAULT_PYTHON_VERSIONS = {
     'altlinux':['2','3'],
     'fedora': ['3'],
