@@ -7,9 +7,14 @@ Summary:        {{ data.summary }}
 License:        {{ data.license | join(' ') }}
 URL:            {{ data.url }}
 Source0:        %{name}-%{version}.tar.gz
-
+{%- if not data.has_extension %}
+BuildArch:      noarch
+{%- endif %}
+{%- for pv in data.sorted_python_versions %}
+{{ dependencies(data.build_deps, False, pv, data.base_python_version, False) }}
+{%- endfor %}
 # BuildRequires:  Зависимости для сборки.  Обязательно укажите все необходимые пакеты!
-BuildRequires:  python3-devel, python3-setuptools, python3-wheel
+# BuildRequires:  python3-devel, python3-setuptools, python3-wheel
 BuildRequires:  {{ data.buildrequires | join(' ') }} # Добавьте сюда все ваши BuildRequires
 
 
