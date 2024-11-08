@@ -42,7 +42,7 @@ All of the `pyp2rpm` options are:
       -t TEMPLATE                     Template file (jinja2 format) to render
                                       (default: "fedora").Search order is 1)
                                       filesystem, 2) default templates.
-      -o [fedora|epel7|epel6|mageia|pld]
+      -o [altlinux|fedora|epel7|epel6|mageia|pld]
                                       Default distro whose conversion rules to use
                                       (default:"fedora"). Default templates have
                                       their rules associated and ignore this.
