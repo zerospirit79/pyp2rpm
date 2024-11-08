@@ -1,6 +1,6 @@
 import sys
 import json
-from distutils.core import Command
+from setuptools import Command
 
 
 class extract_dist(Command):
