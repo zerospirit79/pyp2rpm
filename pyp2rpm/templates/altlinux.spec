@@ -1,3 +1,6 @@
+{{ data.credit_line }}
+{% from 'macros.spec' import dependencies, for_python_versions, underscored_or_pypi, macroed_url -%}
+%global pypi_name {{ data.name }}
 %define name {{ data.pkg_name | macroed_pkg_name(data.srcname) }}
 
 Name:           %{name}
@@ -19,7 +22,21 @@ BuildRequires:  {{ data.buildrequires | join(' ') }} # Добавьте сюда
 
 
 %description
-{{ data.description }}
+{{ data.description|truncate(400)|wordwrap }}
+{% for pv in data.sorted_python_versions %}
+%package -n     {{data.pkg_name|macroed_pkg_name(data.srcname)|name_for_python_version(pv, True) }}
+Summary:        %{summary}
+%{?python_provide:%python_provide {{data.pkg_name|macroed_pkg_name(data.srcname)|name_for_python_version(pv, True)}}}
+{{ dependencies(data.runtime_deps, True, pv, pv) }}
+%description -n {{data.pkg_name|macroed_pkg_name(data.srcname)|name_for_python_version(pv, True) }}
+{{ data.description|truncate(400)|wordwrap }}
+{% endfor -%}
+{%- if data.sphinx_dir %}
+%package -n {{ data.pkg_name|macroed_pkg_name(data.srcname)|name_for_python_version(None, True) }}-doc
+Summary:        {{ data.name }} documentation
+%description -n {{ data.pkg_name|macroed_pkg_name(data.srcname)|name_for_python_version(None, True) }}-doc
+Documentation for {{ data.name }}
+{%- endif %}
 
 %prep
 %setup -q
