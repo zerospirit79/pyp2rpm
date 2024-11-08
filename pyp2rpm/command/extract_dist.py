@@ -1,50 +1,68 @@
 import sys
 import json
-from setuptools import setup, find_packages  # Импорт setuptools
+from setuptools import Command  # Импорт Command из setuptools
 
 
-class extract_dist:  # Удален наследование от Command
-    """Custom function to extract metadata."""
+class extract_dist(Command):
+    """Custom distutils command to extract metadata form setup function."""
+    description = ("Assigns self.distribution to class attribute to make "
+                   "it accessible from outside a class.")
+    user_options = [('stdout', None,
+                     'print metadata in json format to stdout')]
     class_metadata = None
+    stdout = False
 
-    def __init__(self, metadata_from_setup):
-        """Metadata dictionary is created."""
-        self.metadata = {}
-        self.fill_metadata(metadata_from_setup)
+    def initialize_options(self):
+        """Sets default value of the stdout option."""
+        self.stdout = False
 
-    def fill_metadata(self, metadata):
-      self.metadata = {}
-      for attr in ['setup_requires', 'tests_require', 'install_requires',
-                   'packages', 'py_modules', 'scripts']:
-          self.metadata[attr] = to_list(metadata.get(attr, []))
-
-      try:
-          for k, v in metadata.get('extras_require', {}).items():
-              if k in ['test, docs', 'doc', 'dev']:
-                  attr = 'setup_requires'
-              else:
-                  attr = 'install_requires'
-              self.metadata[attr] += to_list(v)
-      except (AttributeError, ValueError):
-          pass # extras_require are skipped in case of wrong data format
-
-      for attr in ['url', 'long_description', 'description', 'license']:
-          self.metadata[attr] = to_str(metadata.get(attr))
-
-      self.metadata['classifiers'] = to_list(metadata.get('classifiers', []))
-
-      self.metadata['entry_points'] = metadata.get('entry_points')
-
-      self.metadata['test_suite'] = metadata.get("test_suite") is not None
-
+    def finalize_options(self):
+        pass  # Abstract method from Command needs to be overridden
 
     def run(self):
-        """Sends extracted metadata in json format to stdout."""
+        """Sends extracted metadata in json format to stdout if stdout
+        option is specified, assigns metadata dictionary to class_metadata
+        variable otherwise.
+        """
+        metadata = self.get_metadata()
         if self.stdout:
             sys.stdout.write("extracted json data:\n" + json.dumps(
-                self.metadata, default=to_str) + "\n")
+                metadata, default=to_str) + "\n")
         else:
-            extract_dist.class_metadata = self.metadata
+            extract_dist.class_metadata = metadata
+
+    def get_metadata(self):
+        metadata = {}
+
+        for attr in ['setup_requires', 'tests_require', 'install_requires',
+                     'packages', 'py_modules', 'scripts']:
+            metadata[attr] = to_list(getattr(self.distribution, attr, []))
+
+        try:
+            for k, v in getattr(self.distribution, 'extras_require', {}).items():
+                if k in ['test, docs', 'doc', 'dev']:
+                    attr = 'setup_requires'
+                else:
+                    attr = 'install_requires'
+                metadata[attr] += to_list(v)
+        except (AttributeError, ValueError):
+            pass  # extras_require are skipped in case of wrong data format
+
+        for attr in ['url', 'long_description', 'description', 'license']:
+            metadata[attr] = to_str(
+                getattr(self.distribution.metadata, attr, None))
+
+        metadata['classifiers'] = to_list(
+            getattr(self.distribution.metadata, 'classifiers', []))
+
+        if isinstance(getattr(self.distribution, "entry_points", None), dict):
+            metadata['entry_points'] = self.distribution.entry_points
+        else:
+            metadata['entry_points'] = None
+
+        metadata['test_suite'] = getattr(
+            self.distribution, "test_suite", None) is not None
+        return metadata
 
 def to_list(var):
     """Checks if given value is a list, tries to convert, if it is not."""
