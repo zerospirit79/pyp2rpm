@@ -1,14 +1,10 @@
 import sys
 import json
-from setuptools import Command
+from setuptools import find_packages
 
 
-class extract_dist(Command):
+class extract_dist:
     """Custom distutils command to extract metadata form setup function."""
-    description = ("Assigns self.distribution to class attribute to make "
-                   "it accessible from outside a class.")
-    user_options = [('stdout', None,
-                     'print metadata in json format to stdout')]
     class_metadata = None
 
     def __init__(self, *args, **kwargs):
@@ -16,10 +12,12 @@ class extract_dist(Command):
         that were not found are set to default empty values. Checks of data
         types are performed.
         """
-        Command.__init__(self, *args, **kwargs)
 
         self.metadata = {}
+        self.fill_metadata(metadata_from_setup)
 
+   def fill_metadata(self, metadata):
+      self.metadata = {} 
         for attr in ['setup_requires', 'tests_require', 'install_requires',
                      'packages', 'py_modules', 'scripts']:
             self.metadata[attr] = to_list(getattr(self.distribution, attr, []))
