@@ -43,8 +43,8 @@ Documentation for {{ data.name }}
 
 %build
 {% for pv in data.sorted_python_versions %}
-%py{{ pv }}_build:
- %{__python{{ pv }}} setup.py build
+%pyproject_build:
+ %{__python{{ pv }}} -m build --wheel --no-isolation
 {% endfor %}
 
 {% if data.sphinx_dir %}
@@ -55,8 +55,8 @@ Documentation for {{ data.name }}
 
 %install
 {% for pv in data.sorted_python_versions + [data.base_python_version] %}
-%py{{ pv }}_install:
- %{__python{{ pv }}} setup.py install --root=%{buildroot}
+%pyproject_install:
+ %{__python{{ pv }}} -m pip install --root=%{buildroot} .
 {% endfor %}
 
 # Удаление скриптов, если необходима переустановка (только для базовой версии Python)
