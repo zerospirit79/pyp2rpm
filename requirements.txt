@@ -1,0 +1,13 @@
+setuptools
+flexmock >= 0.9.3
+pytest-runner
+click
+Jinja2
+packaging
+pytest
+iniconfig
+attrs 
+pluggy 
+virtualenv-api
+sclize
+spec2scl >= 1.2.0
