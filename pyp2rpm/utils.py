@@ -21,7 +21,7 @@ PY3 = sys.version > '3'
 if PY3:
     str_classes = (str, bytes)
 else:
-    str_classes = (str, unicode)
+    str_classes = (str,)
 
 
 class ChangeDir(object):
