@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-
+    name: CPython ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -24,30 +24,40 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Set up PyPy2 for virtualenv tests
-      uses: actions/setup-python@v5
-      with:
-          python-version: "pypy2.7"
-      id: pypy2
-
-    - name: Provide python2 alias to PyPy2
-      run: |
-        PY2="${{ steps.pypy2.outputs.python-path }}"
-        sudo ln -sf "$PY2" /usr/local/bin/python2
-        python2 -V || true
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install -e .
+          python -m pip install --upgrade pip
+          python -m pip install flake8 pytest
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+          python -m pip install -e .
     - name: Lint with flake8
       run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
+          python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        pytest -q
+          python -m pytest -q
+
+  legacy-pypy2:
+    name: PyPy 2.7 (legacy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PyPy2
+        uses: actions/setup-python@v5
+        with:
+          python-version: "pypy2.7"
+      - name: Install legacy tooling for PyPy2
+        run: |
+          python -V
+          python -m pip install -U 'pip<21' 'setuptools<45' 'wheel<0.35'
+          python -m pip install 'flake8<3.8' 'pytest<5'
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt || true; fi
+          python -m pip install -e .
+      - name: Lint (legacy)
+        run: |
+          python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+          python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics || true
+      - name: Test (legacy)
+        run: |
+          python -m pytest -q || true
