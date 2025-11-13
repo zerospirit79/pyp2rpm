@@ -5,7 +5,7 @@ from setuptools import Command  # Импорт Command из setuptools
 
 class extract_dist(Command):
     """Custom distutils command to extract metadata form setup function."""
-    description = ("Assigns self.distribution to class attribute to make "
+    description = ("Assigns Distribution to class attribute to make "
                    "it accessible from outside a class.")
     user_options = [('stdout', None,
                      'print metadata in json format to stdout')]
