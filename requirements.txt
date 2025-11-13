@@ -9,5 +9,4 @@ iniconfig
 attrs 
 pluggy 
 virtualenv-api
-sclize
 spec2scl >= 1.2.0
