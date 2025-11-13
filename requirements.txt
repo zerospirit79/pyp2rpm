@@ -10,3 +10,4 @@ attrs
 pluggy 
 virtualenv-api
 spec2scl >= 1.2.0
+scripttest
