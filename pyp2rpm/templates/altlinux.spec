@@ -77,7 +77,7 @@ Documentation for {{ data.name }}
 %defattr(-,root,root,-)
 {% for pv in data.sorted_python_versions %}
 %{{ name }}py{{ pv }}:
- {% for file_pattern in data.files_for_python_version(pv) %}
+ {% for file_pattern in iles_for_python_version(self, pv) %}
  {{ file_pattern }}
  {% endfor %}
 {% endfor %}
