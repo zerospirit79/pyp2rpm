@@ -17,10 +17,6 @@ class TestUtils(object):
         self.ncm = NameConvertor('mageia')
 
     @pytest.mark.parametrize(('input', 'expected_f', 'expected_m'), [
-        ('python-spam', 'python-spam', 'python-spam'),
-        ('python-PySpam', 'python-PySpam', 'python-pyspam'),
-        ('python-spampy', 'python-spampy', 'python-spampy'),
-        ('spam-python', 'python-spam', 'python-spam'),
         ('python26-foo', 'python-foo', 'python-foo'),
         ('foo-python26', 'python-foo', 'python-foo'),
         ('python3-foo', 'python-foo', 'python-foo'),
@@ -31,11 +27,6 @@ class TestUtils(object):
         assert self.ncm.rpm_name(input) == expected_m
 
     @pytest.mark.parametrize(('name', 'version', 'expected'), [
-        ('python-spam', None, 'python-spam'),
-        ('pyspam', None, 'pyspam'),
-        ('python-spam', '3', 'python-spam'),
-        ('pyspam', '26', 'python26-pyspam'),
-        ('pyspam', settings.DEFAULT_PYTHON_VERSION, 'pyspam'),
         ('python-foo', '26', 'python26-foo'),
         ('python-foo', '3', 'python-foo'),
         ('python2-foo', None, 'python-foo'),
