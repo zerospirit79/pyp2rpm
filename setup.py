@@ -48,7 +48,7 @@ setup(
     package_data={'pyp2rpm': ['templates/*.spec']},
     entry_points={'console_scripts': ['pyp2rpm = pyp2rpm.bin:main']},
     install_requires=['Jinja2',
-                      'setuptools',
+                      'setuptools>=40.8.0,<81',
                       'click',
                       ],
     setup_requires=['setuptools'],
