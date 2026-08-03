@@ -29,17 +29,17 @@ class TestSpec(object):
         shutil.rmtree(self.temp_dir)
 
     @pytest.mark.parametrize(('package', 'options', 'expected'), [
-        ('Jinja2', '-v2.8', 'python-Jinja2_py3_autonc.spec'),
-        ('Jinja2', '-v2.8 -p2', 'python-Jinja2_py23_autonc.spec'),
-        ('Jinja2', '-v2.8 -b2', 'python-Jinja2_py2_autonc.spec'),
-        ('Jinja2', '-v2.8 -b3', 'python-Jinja2_py3_autonc.spec'),
+        ('Jinja2', '-v2.8 -t fedora', 'python-Jinja2_py3_autonc.spec'),
+        ('Jinja2', '-v2.8 -p2 -t fedora', 'python-Jinja2_py23_autonc.spec'),
+        ('Jinja2', '-v2.8 -b2 -t fedora', 'python-Jinja2_py2_autonc.spec'),
+        ('Jinja2', '-v2.8 -b3 -t fedora', 'python-Jinja2_py3_autonc.spec'),
         ('Jinja2', '-v2.8 -b3 -p2 -t epel7', 'python-Jinja2_epel7{0}.spec'),
         ('Jinja2', '-v2.8 -t epel6', 'python-Jinja2_epel6{0}.spec'),
         ('Jinja2', '-v2.8 -p2 -t mageia', 'python-Jinja2_mageia_py23.spec'),
-        ('Jinja2', '-v2.8 -p2 --no-autonc', 'python-Jinja2{0}.spec'),
-        ('paperwork-backend', '-v1.2.4', 'python-paperwork-backend.spec'),
-        ('Sphinx', '-v1.5 -r python-sphinx -p2', 'python-sphinx_autonc.spec'),
-        ('{0}/test_data/utest-0.1.0.tar.gz'.format(tests_dir), '',
+        ('Jinja2', '-v2.8 -p2 --no-autonc -t fedora', 'python-Jinja2{0}.spec'),
+        ('paperwork-backend', '-v1.2.4 -t fedora', 'python-paperwork-backend.spec'),
+        ('Sphinx', '-v1.5 -r python-sphinx -p2 -t fedora', 'python-sphinx_autonc.spec'),
+        ('{0}/test_data/utest-0.1.0.tar.gz'.format(tests_dir), '-t fedora',
          'python-utest.spec'),
         ('{0}/test_data/utest-0.1.0.tar.gz'.format(tests_dir), '-t epel7',
          'python-utest_epel7.spec'),
@@ -74,7 +74,7 @@ class TestSrpm(object):
 
     @pytest.mark.webtest
     def test_srpm(self):
-        res = self.env.run('{0} Jinja2 -v2.8 --srpm'.format(self.exe),
+        res = self.env.run('{0} Jinja2 -v2.8 -t fedora --srpm'.format(self.exe),
                            expect_stderr=True)
         assert res.returncode == 0
 
