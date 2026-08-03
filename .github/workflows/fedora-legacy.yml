@@ -1,8 +1,10 @@
+# Disabled: Python 2.7 / 3.4 are EOL; Fedora 30 packaging pulls modern
+# MarkupSafe that is incompatible with the image setuptools.
+# Re-enable only if you restore a working legacy container + pinned deps.
 name: Run tests in a legacy environment
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   fedora_test:
