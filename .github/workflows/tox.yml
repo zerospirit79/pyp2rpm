@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Run Tox tests
         uses: fedora-python/tox-github-action@main
@@ -20,8 +20,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tox_env: [py36, py37, py38, py39, py310]
+        # Interpreters available in fedorapython/fedora-python-tox:f43
+        tox_env: [py39, py310, py311, py312, py313]
         include:
-          # Python 3.10 needs to compile cffi
           - tox_env: py310
             dnf_install: libffi-devel
