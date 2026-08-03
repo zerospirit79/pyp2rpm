@@ -99,6 +99,13 @@ class NameConvertor(object):
             name, python_version))
         rpmized_name = self.base_name(name)
 
+        if self.distro == 'altlinux':
+            # ALT Linux: packages are python3-module-*, deps are python3(name)
+            alt_name = safe_name(rpmized_name).lower()
+            if pkg_name:
+                return 'python3-module-{0}'.format(alt_name)
+            return 'python3({0})'.format(alt_name)
+
         rpmized_name = 'python-{0}'.format(rpmized_name)
 
         if self.distro == 'mageia':

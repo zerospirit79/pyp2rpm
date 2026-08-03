@@ -2,7 +2,7 @@ from pyp2rpm import utils
 
 DEFAULT_TEMPLATE = 'altlinux'
 DEFAULT_PYTHON_VERSIONS = {
-    'altlinux':['2','3'],
+    'altlinux': ['3'],
     'fedora': ['3'],
     'epel7': ['2', '3'],
     'epel6': ['2'],

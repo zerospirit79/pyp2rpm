@@ -1,92 +1,62 @@
 import sys
 import json
-from setuptools import find_packages
+from setuptools import Command
+from setuptools.dist import Distribution
 
-
-class extract_dist:
-    """Custom distutils command to extract metadata form setup function."""
+class extract_dist(Command):
+    """Custom setuptools command to extract metadata from setup function."""
+    description = "Extract metadata from setup function."
+    user_options = [('stdout', None, 'print metadata in JSON format to stdout')]
     class_metadata = None
 
-    def __init__(self, *args, **kwargs):
-        """Metadata dictionary is created, all the metadata attributes,
-        that were not found are set to default empty values. Checks of data
-        types are performed.
-        """
-
-        self.metadata = {}
-        self.fill_metadata(metadata_from_setup)
-
-   def fill_metadata(self, metadata):
-      self.metadata = {} 
-        for attr in ['setup_requires', 'tests_require', 'install_requires',
-                     'packages', 'py_modules', 'scripts']:
-            self.metadata[attr] = to_list(getattr(self.distribution, attr, []))
-
-        try:
-            for k, v in getattr(
-                    self.distribution, 'extras_require', {}).items():
-                if k in ['test, docs', 'doc', 'dev']:
-                    attr = 'setup_requires'
-                else:
-                    attr = 'install_requires'
-                self.metadata[attr] += to_list(v)
-        except (AttributeError, ValueError):
-            # extras require are skipped in case of wrong data format
-            # can't log here, because this file is executed in a subprocess
-            pass
-
-        for attr in ['url', 'long_description', 'description', 'license']:
-            self.metadata[attr] = to_str(
-                getattr(self.distribution.metadata, attr, None))
-
-        self.metadata['classifiers'] = to_list(
-            getattr(self.distribution.metadata, 'classifiers', []))
-
-        if isinstance(getattr(self.distribution, "entry_points", None), dict):
-            self.metadata['entry_points'] = self.distribution.entry_points
-        else:
-            self.metadata['entry_points'] = None
-
-        self.metadata['test_suite'] = getattr(
-            self.distribution, "test_suite", None) is not None
-
     def initialize_options(self):
-        """Sets default value of the stdout option."""
         self.stdout = False
 
     def finalize_options(self):
-        """Abstract method of Command class have to be overridden."""
         pass
 
     def run(self):
-        """Sends extracted metadata in json format to stdout if stdout
-        option is specified, assigns metadata dictionary to class_metadata
-        variable otherwise.
-        """
+        metadata = self.extract_metadata()
         if self.stdout:
-            sys.stdout.write("extracted json data:\n" + json.dumps(
-                self.metadata, default=to_str) + "\n")
+            print("extracted JSON data:\n", json.dumps(metadata, indent=2, default=str))
         else:
-            extract_dist.class_metadata = self.metadata
+            extract_dist.class_metadata = metadata
 
+    def extract_metadata(self):
+        #  Получаем данные из self.distribution.  Этот метод работает, только если вызывается из контекста setuptools.setup()
+        metadata = {}
+        distribution = self.distribution  # Доступ к объекту Distribution
 
-def to_list(var):
-    """Checks if given value is a list, tries to convert, if it is not."""
-    if var is None:
-        return []
-    if isinstance(var, str):
-        var = var.split('\n')
-    elif not isinstance(var, list):
-        try:
-            var = list(var)
-        except TypeError:
-            raise ValueError("{} cannot be converted to the list.".format(var))
-    return var
+        # Обработка основных зависимостей
+        for attr in ['setup_requires', 'tests_require', 'install_requires',
+                     'packages', 'py_modules', 'scripts', 'package_data']:
+            value = getattr(distribution, attr, [])
+            metadata[attr] = self._normalize_value(value)
 
+        # Обработка дополнительных зависимостей (extras_require)
+        extras_require = getattr(distribution, 'extras_require', {})
+        for key, value in extras_require.items():
+            metadata.setdefault('extras_require', {}).update({key: self._normalize_value(value)})
 
-def to_str(var):
-    """Similar to to_list function, but for string attributes."""
-    try:
-        return str(var)
-    except TypeError:
-        raise ValueError("{} cannot be converted to string.".format(var))
+        # Обработка метаданных
+        for attr in ['url', 'long_description', 'description', 'license', 'classifiers']:
+            value = getattr(distribution.metadata, attr, None)
+            metadata[attr] = self._normalize_value(value)
+
+        # Обработка entry_points
+        entry_points = getattr(distribution, "entry_points", None)
+        metadata['entry_points'] = entry_points if isinstance(entry_points, dict) else None
+
+        # Обработка test_suite (булевое значение)
+        metadata['test_suite'] = getattr(distribution, "test_suite", None) is not None
+
+        return metadata
+
+    def _normalize_value(self, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, (list, tuple)):
+            return [item.strip() for item in value]
+        return value

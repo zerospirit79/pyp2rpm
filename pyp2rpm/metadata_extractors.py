@@ -288,8 +288,11 @@ class LocalMetadataExtractor(object):
         archive_data = {}
 
         archive_data['runtime_deps'] = self.runtime_deps
-        archive_data['build_deps'] = [
-            ['BuildRequires', 'python2-devel', '{name}']] + self.build_deps
+        if getattr(self, 'distro', None) == 'altlinux':
+            archive_data['build_deps'] = list(self.build_deps)
+        else:
+            archive_data['build_deps'] = [
+                ['BuildRequires', 'python2-devel', '{name}']] + self.build_deps
 
         archive_data['py_modules'] = self.py_modules
         archive_data['scripts'] = self.scripts
