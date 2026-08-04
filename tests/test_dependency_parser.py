@@ -1,6 +1,6 @@
 import pytest
 
-from pkg_resources import Requirement as R
+from packaging.requirements import Requirement as R
 
 from pyp2rpm.dependency_parser import dependency_to_rpm
 
@@ -58,7 +58,7 @@ class TestDependencyParser():
     ])
     def test_dependency_to_rpm(self, d, r, rich, expected):
         # we can't convert lists of lists into sets => compare len and contents
-        rpm_deps = dependency_to_rpm(R.parse(d), r, rich)
+        rpm_deps = dependency_to_rpm(R(d), r, rich)
         for dep in expected:
             assert dep in rpm_deps
         assert len(expected) == len(rpm_deps)

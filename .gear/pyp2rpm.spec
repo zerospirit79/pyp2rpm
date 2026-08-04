@@ -6,7 +6,7 @@
 
 Name: python3-module-%pypi_name
 
-Version: 3.3.10
+Version: 3.4.0
 Release: alt1
 Summary: Tool to convert a package from PyPI to RPM SPECFILE or to generate SRPM.  
 License: MIT
@@ -73,5 +73,9 @@ install -Dpm644 %pypi_name.1 -t %buildroot%_man1dir
 
 
 %changelog
+* Tue Aug 04 2026 Pavel Shilov <zerospirit@altlinux.ru> 3.4.0-alt1
+- support source archives with pyproject.toml/setup.cfg but without setup.py
+- drop deprecated pkg_resources usage (name normalization and deps parsing)
+
 * Fri Nov 08 2024 Pavel Shilov <zerospirit@altlinux.ru> 3.3.10-alt1
 - initial build for Sisyphus

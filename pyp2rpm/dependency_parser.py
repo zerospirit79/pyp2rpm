@@ -1,18 +1,37 @@
 import logging
 import re
 
-from pkg_resources import Requirement
+from packaging.requirements import Requirement
+from packaging.requirements import InvalidRequirement
 
 from pyp2rpm.dependency_convert import convert_requirement
 
 logger = logging.getLogger(__name__)
 
 
+class ParsedRequirement(object):
+    """Compatibility adapter for dependency_convert.*_requirement helpers."""
+
+    def __init__(self, requirement):
+        self.project_name = requirement.name
+        self.specs = [(spec.operator, spec.version)
+                      for spec in requirement.specifier]
+
+
+def _as_parsed_requirement(dep):
+    """Accept both legacy-style and packaging Requirement objects."""
+    if hasattr(dep, 'project_name') and hasattr(dep, 'specs'):
+        return dep
+    if hasattr(dep, 'name') and hasattr(dep, 'specifier'):
+        return ParsedRequirement(dep)
+    return dep
+
+
 def dependency_to_rpm(dep, runtime, use_rich_deps=True):
-    """Converts a dependency got by pkg_resources.Requirement.parse()
+    """Converts a dependency got by packaging.requirements.Requirement
     to RPM format.
     Args:
-        dep - a dependency retrieved by pkg_resources.Requirement.parse()
+        dep - a dependency retrieved by packaging Requirement parser
         runtime - whether the returned dependency should be runtime (True)
         or build time (False)
     Returns:
@@ -23,7 +42,7 @@ def dependency_to_rpm(dep, runtime, use_rich_deps=True):
     """
     logger.debug('Dependencies provided: {0} runtime: {1}.'.format(
         dep, runtime))
-    converted = convert_requirement(dep, use_rich_deps)
+    converted = convert_requirement(_as_parsed_requirement(dep), use_rich_deps)
 
     if not runtime:
         for conv in converted:
@@ -47,8 +66,8 @@ def deps_from_pyp_format(requires, runtime=True, use_rich_deps=True):
 
     for req in requires:
         try:
-            parsed.append(Requirement.parse(req))
-        except ValueError:
+            parsed.append(ParsedRequirement(Requirement(req)))
+        except InvalidRequirement:
             logger.warn("Unparsable dependency {0}.".format(req),
                         exc_info=True)
 

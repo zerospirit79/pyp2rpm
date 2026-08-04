@@ -9,7 +9,8 @@ try:
     import urllib.request as request
 except ImportError:
     import urllib as request
-from pkg_resources import parse_version
+from packaging.version import parse as parse_version
+from packaging.version import InvalidVersion
 
 
 from pyp2rpm import settings
@@ -17,6 +18,13 @@ from pyp2rpm import exceptions
 
 
 logger = logger = logging.getLogger(__name__)
+
+
+def _is_prerelease(version):
+    try:
+        return parse_version(version).is_prerelease
+    except InvalidVersion:
+        return False
 
 
 def get_url(client, name, version, wheel=False, hashed_format=False):
@@ -142,7 +150,7 @@ class PypiDownloader(PackageGetter):
             # Use only stable versions, unless --pre was specified
             if not prerelease:
                 self.versions = [candidate for candidate in self.versions
-                                 if not parse_version(candidate).is_prerelease]
+                                 if not _is_prerelease(candidate)]
 
             # If versions is empty list then there is no such package on PyPI
             if not self.versions:

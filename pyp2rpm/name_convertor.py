@@ -4,12 +4,15 @@ try:
     import dnf
 except ImportError:
     dnf = None
-from pkg_resources import safe_name
-
 from pyp2rpm import settings
 
 
 logger = logging.getLogger(__name__)
+
+
+def safe_name(name):
+    """Normalize distribution name similarly to pkg_resources.safe_name."""
+    return re.sub(r'[^A-Za-z0-9.]+', '-', name)
 
 
 class NameConvertor(object):

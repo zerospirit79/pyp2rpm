@@ -1,2 +1,2 @@
-tar: .
-spec: .gear/python3-module-pyp2rpm.spec
+tar: v@version@:.
+spec: .gear/pyp2rpm.spec

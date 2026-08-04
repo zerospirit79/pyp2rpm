@@ -329,13 +329,19 @@ class SetupPyMetadataExtractor(LocalMetadataExtractor):
         try:
             with self.archive as package_archive:
                 package_archive.extract_all(directory=temp_dir)
-                self.metadata = self._get_metadata(temp_dir)
+                setup_py = self.get_setup_py(temp_dir, raise_on_missing=False)
+                if setup_py:
+                    self.metadata = self._get_metadata(setup_py)
+                else:
+                    project_root = self.get_project_root(temp_dir)
+                    self.metadata = self._get_metadata_from_project_dir(
+                        project_root)
         finally:
             shutil.rmtree(temp_dir)
 
-    def _get_metadata(self, temp_dir):
+    def _get_metadata(self, setup_py_path):
         runner = SubprocessModuleRunner(
-            self.get_setup_py(temp_dir),
+            setup_py_path,
             *settings.EXTRACT_DIST_COMMAND_ARGS + ['--stdout'])
 
         current_version = self.base_python_version or str(sys.version_info[0])
@@ -364,15 +370,34 @@ class SetupPyMetadataExtractor(LocalMetadataExtractor):
                 ', '.join(pyp2rpm.logger.destinations)))
             raise SystemExit(3)
 
-    def get_setup_py(self, directory):
-        try:
-            return glob.glob("{0}/{1}*/setup.py".format(
-                directory, self.archive.top_directory or self.name))[0]
-        except IndexError:
+    def get_setup_py(self, directory, raise_on_missing=True):
+        matches = glob.glob("{0}/{1}*/setup.py".format(
+            directory, self.archive.top_directory or self.name))
+        if matches:
+            return matches[0]
+        if raise_on_missing:
             sys.stderr.write(
                 "setup.py not found, maybe {} is not "
                 "proper source archive.\n".format(self.local_file))
             raise SystemExit(3)
+        return None
+
+    def get_project_root(self, directory):
+        matches = glob.glob("{0}/{1}*".format(
+            directory, self.archive.top_directory or self.name))
+        if matches:
+            return matches[0]
+        return directory
+
+    def _get_metadata_from_project_dir(self, project_dir):
+        from pyp2rpm.local_project import read_project_metadata
+        metadata = read_project_metadata(project_dir)
+        if metadata:
+            return metadata
+        sys.stderr.write(
+            "setup.py not found and metadata could not be extracted from "
+            "pyproject.toml/setup.cfg in {}.\n".format(self.local_file))
+        raise SystemExit(3)
 
     @property
     def runtime_deps(self):  # install_requires

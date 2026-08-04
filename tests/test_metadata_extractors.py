@@ -1,4 +1,5 @@
 import os
+import tarfile
 
 import setuptools
 import pytest
@@ -352,6 +353,33 @@ class TestSetupPyMetadataExtractor(object):
         data = self.e[0].extract_data()
         assert data.data['doc_license'] == license
         assert data.data['doc_files'] == other
+
+
+def test_setup_py_metadata_extractor_fallbacks_to_pyproject(tmp_path):
+    project_dir = tmp_path / 'needly-2.5.95'
+    project_dir.mkdir()
+    (project_dir / 'pyproject.toml').write_text(
+        '[build-system]\n'
+        'requires = ["hatchling>=1"]\n'
+        'build-backend = "hatchling.build"\n'
+        '\n'
+        '[project]\n'
+        'name = "needly"\n'
+        'version = "2.5.95"\n'
+        'dependencies = ["requests>=2"]\n',
+        encoding='utf-8')
+
+    archive_path = tmp_path / 'needly-2.5.95.tar.gz'
+    with tarfile.open(str(archive_path), 'w:gz') as tar:
+        tar.add(str(project_dir), arcname='needly-2.5.95')
+
+    extractor = me.SetupPyMetadataExtractor(
+        str(archive_path), 'needly', NameConvertor('fedora'), '2.5.95')
+
+    assert extractor.metadata['name'] == 'needly'
+    assert extractor.metadata['version'] == '2.5.95'
+    assert extractor.metadata['install_requires'] == ['requests>=2']
+    assert 'hatchling>=1' in extractor.metadata['setup_requires']
 
 
 class TestWheelMetadataExtractor(object):

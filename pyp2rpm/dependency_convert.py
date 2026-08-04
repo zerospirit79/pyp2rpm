@@ -1,4 +1,18 @@
-from pkg_resources import parse_version
+from packaging.version import Version
+from packaging.version import InvalidVersion
+
+
+class _ParsedVersion(object):
+    def __init__(self, value):
+        self._version = value
+
+
+def parse_version(version_id):
+    """Parse with packaging, keep legacy-like fallback for invalid versions."""
+    try:
+        return _ParsedVersion(Version(version_id))
+    except InvalidVersion:
+        return _ParsedVersion(version_id)
 
 class RpmVersion():
     def __init__(self, version_id):
