@@ -134,6 +134,11 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/{{ script|script_name_for_python_version(pv) }}
 {%- endfor %}
 {%- endif %}
+{%- if pv == data.base_python_version %}
+{%- for man_file in data.man_files %}
+{{ man_file }}
+{%- endfor %}
+{%- endif %}
 
 {%- if data.py_modules %}
 {% for module in data.py_modules -%}

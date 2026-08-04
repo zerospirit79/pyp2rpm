@@ -86,6 +86,106 @@ def versions_from_trove(trove):
         set([v for v in versions if v.replace('.', '', 1).isdigit()]))
 
 
+def man_file_entries(paths):
+    """Convert discovered manpage paths to RPM %%files entries."""
+    entries = set()
+    sectioned = re.compile(r'^(?P<name>.+)\.(?P<section>[1-9])(?:\..+)?$')
+    for path in paths or []:
+        base = os.path.basename(path)
+        match = sectioned.match(base)
+        if not match:
+            continue
+        entries.add('%{{_mandir}}/man{0}/{1}.{0}*'.format(
+            match.group('section'), match.group('name')))
+    return sorted(entries)
+
+
+KNOWN_RPM_GROUPS = set([
+    'Accessibility', 'Archiving/Backup', 'Archiving/Cd burning',
+    'Archiving/Compression', 'Archiving/Other', 'Books/Computer books',
+    'Books/Faqs', 'Books/Howtos', 'Books/Literature', 'Books/Other',
+    'Communications', 'Databases', 'Development/C', 'Development/C++',
+    'Development/Databases', 'Development/Debug',
+    'Development/Debuggers', 'Development/Documentation',
+    'Development/Erlang', 'Development/Functional',
+    'Development/GNOME and GTK+', 'Development/Haskell',
+    'Development/Java', 'Development/KDE and QT', 'Development/Kernel',
+    'Development/Lisp', 'Development/ML', 'Development/Objective-C',
+    'Development/Other', 'Development/Perl', 'Development/Python',
+    'Development/Python3', 'Development/Ruby', 'Development/Scheme',
+    'Development/Tcl', 'Development/Tools', 'Documentation', 'Editors',
+    'Education', 'Emulators', 'Engineering', 'File tools',
+    'Games/Adventure', 'Games/Arcade', 'Games/Boards', 'Games/Cards',
+    'Games/Educational', 'Games/Other', 'Games/Puzzles', 'Games/Sports',
+    'Games/Strategy', 'Graphical desktop/Enlightenment',
+    'Graphical desktop/FVWM based', 'Graphical desktop/GNOME',
+    'Graphical desktop/GNUstep', 'Graphical desktop/Icewm',
+    'Graphical desktop/KDE', 'Graphical desktop/MATE',
+    'Graphical desktop/Motif', 'Graphical desktop/Other',
+    'Graphical desktop/Rox', 'Graphical desktop/Sawfish',
+    'Graphical desktop/Sugar', 'Graphical desktop/Window Maker',
+    'Graphical desktop/XFce', 'Graphics', 'Monitoring',
+    'Networking/Chat', 'Networking/DNS', 'Networking/File transfer',
+    'Networking/FTN', 'Networking/IRC', 'Networking/Instant messaging',
+    'Networking/Mail', 'Networking/News', 'Networking/Other',
+    'Networking/Remote access', 'Networking/WWW', 'Office', 'Other',
+    'Publishing', 'Sciences/Astronomy', 'Sciences/Biology',
+    'Sciences/Chemistry', 'Sciences/Computer science',
+    'Sciences/Geosciences', 'Sciences/Mathematics', 'Sciences/Medicine',
+    'Sciences/Other', 'Sciences/Physics', 'Security/Antivirus',
+    'Security/Networking', 'Shells', 'Sound', 'System/Base',
+    'System/Configuration/Boot and Init', 'System/Configuration/Hardware',
+    'System/Configuration/Networking', 'System/Configuration/Other',
+    'System/Configuration/Packaging', 'System/Configuration/Printing',
+    'System/Fonts/Console', 'System/Fonts/True type',
+    'System/Fonts/Type1', 'System/Fonts/X11 bitmap',
+    'System/Internationalization', 'System/Kernel and hardware',
+    'System/Libraries', 'System/Legacy libraries', 'System/Servers',
+    'System/Servers/ZProducts', 'System/X11', 'System/XFree86',
+    'Terminals', 'Text tools', 'Toys', 'Video'
+])
+
+
+def pypi_project_url(name):
+    return 'https://pypi.org/project/{0}/'.format(name)
+
+
+def github_vcs_url(home_page='', extra_urls=None):
+    candidates = []
+    if home_page:
+        candidates.append(home_page)
+    if isinstance(extra_urls, dict):
+        candidates.extend([v for v in extra_urls.values() if isinstance(v, str)])
+    for candidate in candidates:
+        match = re.search(r'https?://github\.com/[^\s/#?]+/[^\s/#?]+', candidate)
+        if match:
+            return match.group(0).rstrip('/')
+    return ''
+
+
+def group_from_classifiers(classifiers):
+    text = ' '.join(classifiers or []).lower()
+    rules = [
+        ('topic :: internet :: www/http', 'Networking/WWW'),
+        ('topic :: internet', 'Networking/Other'),
+        ('topic :: security', 'Security/Networking'),
+        ('topic :: system :: networking', 'System/Configuration/Networking'),
+        ('topic :: system', 'System/Base'),
+        ('topic :: office', 'Office'),
+        ('topic :: text processing', 'Text tools'),
+        ('topic :: multimedia :: sound', 'Sound'),
+        ('topic :: multimedia :: video', 'Video'),
+        ('topic :: games/entertainment', 'Games/Other'),
+        ('topic :: education', 'Education'),
+        ('topic :: scientific/engineering', 'Sciences/Other'),
+        ('topic :: software development', 'Development/Python3'),
+    ]
+    for token, group in rules:
+        if token in text and group in KNOWN_RPM_GROUPS:
+            return group
+    return 'Development/Python3'
+
+
 def pypi_metadata_extension(extraction_fce):
     """Extracts data from PyPI and merges them with data from extraction
     method.
@@ -298,6 +398,9 @@ class LocalMetadataExtractor(object):
         archive_data['scripts'] = self.scripts
 
         archive_data['home_page'] = self.home_page
+        archive_data['pypi_url'] = pypi_project_url(self.name)
+        archive_data['vcs_url'] = github_vcs_url(self.home_page)
+        archive_data['group'] = group_from_classifiers(self.classifiers)
         archive_data['description'] = self.description
         archive_data['summary'] = self.summary
 
@@ -311,6 +414,7 @@ class LocalMetadataExtractor(object):
         (archive_data['doc_files'],
          archive_data['doc_license']) = self.separate_license_files(
              self.doc_files)
+        archive_data['man_files'] = self.man_files
 
         archive_data['dirname'] = self.archive.top_directory
 
@@ -530,6 +634,17 @@ class SetupPyMetadataExtractor(LocalMetadataExtractor):
         return ['/'.join(x.split('/')[1:]) for x in doc_files]
 
     @property
+    def man_files(self):
+        discovered = []
+        for path in self.archive.files:
+            lower = path.lower()
+            if '/man' not in lower:
+                continue
+            if re.search(r'\.[1-9](?:\.(gz|bz2|xz|zst))?$', lower):
+                discovered.append('/'.join(path.split('/')[1:]))
+        return man_file_entries(discovered)
+
+    @property
     def sphinx_dir(self):
         """Returns directory with sphinx documentation, if there is such.
         Returns:
@@ -616,6 +731,10 @@ class WheelMetadataExtractor(LocalMetadataExtractor):
     @property
     def scripts(self):
         return self.archive.record.get('scripts', [])
+
+    @property
+    def man_files(self):
+        return []
 
     @property
     def home_page(self):
@@ -771,7 +890,22 @@ class DirectoryMetadataExtractor(object):
 
     @property
     def scripts(self):
-        return sorted(set(self.metadata.get('scripts') or []))
+        transformed = list(self.metadata.get('scripts') or [])
+        entry_points = self.metadata.get('entry_points') or {}
+        if isinstance(entry_points, dict):
+            scripts = entry_points.get('console_scripts', [])
+            if isinstance(scripts, dict):
+                transformed.extend(scripts.keys())
+            elif isinstance(scripts, (list, tuple)):
+                for script in scripts:
+                    if not isinstance(script, str):
+                        continue
+                    equal_sign = script.find('=')
+                    if equal_sign == -1:
+                        transformed.append(script)
+                    else:
+                        transformed.append(script[:equal_sign].strip())
+        return sorted(set(os.path.basename(s) for s in transformed if s))
 
     @property
     def home_page(self):
@@ -818,6 +952,25 @@ class DirectoryMetadataExtractor(object):
                 return candidate
         return None
 
+    @property
+    def man_files(self):
+        discovered = []
+        for root, dirs, files in os.walk(self.project_dir):
+            dirs[:] = [d for d in dirs if d not in
+                       ('.git', '.tox', '.venv', 'venv', '__pycache__',
+                        '.eggs', 'dist', 'build')]
+            rel_root = os.path.relpath(root, self.project_dir)
+            rel_root_lower = rel_root.lower()
+            if rel_root != '.' and '/man' not in rel_root_lower and \
+                    not rel_root_lower.startswith('man'):
+                continue
+            for filename in files:
+                lower = filename.lower()
+                if re.search(r'\.[1-9](?:\.(gz|bz2|xz|zst))?$', lower):
+                    discovered.append(filename if rel_root == '.'
+                                      else os.path.join(rel_root, filename))
+        return man_file_entries(discovered)
+
     def extract_data(self, client=None):
         data = PackageData(
             local_file=self.local_file,
@@ -834,6 +987,10 @@ class DirectoryMetadataExtractor(object):
             'py_modules': self.py_modules,
             'scripts': self.scripts,
             'home_page': self.home_page,
+            'pypi_url': pypi_project_url(self.name),
+            'vcs_url': github_vcs_url(
+                self.home_page, self.metadata.get('project_urls')),
+            'group': group_from_classifiers(self.classifiers),
             'description': self.description,
             'summary': self.summary,
             'license': self.license,
@@ -849,6 +1006,7 @@ class DirectoryMetadataExtractor(object):
                                    for s in settings.LICENSE_FILES)],
             'dirname': os.path.basename(self.project_dir.rstrip(os.sep)),
             'source0': os.path.basename(self.project_dir.rstrip(os.sep)),
+            'man_files': self.man_files,
             'has_packages': self.has_packages,
             'packages': self.packages,
             'has_bundled_egg_info': False,

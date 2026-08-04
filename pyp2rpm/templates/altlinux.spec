@@ -13,8 +13,11 @@ Version: {{ data.version | rpm_version(False) }}
 Release: alt1
 Summary: {{ data.summary }}
 License: {{ data.license }}
-Group: Development/Python3
-Url: {{ data.home_page }}
+Group: {{ data.group }}
+Url: {{ data.pypi_url }}
+{%- if data.vcs_url %}
+Vcs: {{ data.vcs_url }}
+{%- endif %}
 
 {%- if not data.has_extension %}
 BuildArch: noarch
@@ -99,6 +102,9 @@ rm -rf html/.{doctrees,buildinfo}
 {%- endif %}
 {%- for script in data.scripts %}
 %_bindir/{{ script }}
+{%- endfor %}
+{%- for man_file in data.man_files %}
+{{ man_file }}
 {%- endfor %}
 {%- if data.has_packages %}
 {%- for package in data.packages %}

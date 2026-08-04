@@ -42,6 +42,36 @@ def _strip_req(req):
     return req
 
 
+def _collect_script_names(mapping):
+    names = []
+    if isinstance(mapping, dict):
+        for name in mapping.keys():
+            if isinstance(name, str) and name.strip():
+                names.append(name.strip())
+    return names
+
+
+def _extract_console_scripts(entry_points):
+    scripts = []
+    if not entry_points:
+        return scripts
+    console = None
+    if isinstance(entry_points, dict):
+        console = entry_points.get('console_scripts')
+    if isinstance(console, dict):
+        scripts.extend(_collect_script_names(console))
+    elif isinstance(console, (list, tuple)):
+        for item in console:
+            if not isinstance(item, str):
+                continue
+            equal_sign = item.find('=')
+            name = item if equal_sign == -1 else item[:equal_sign]
+            name = name.strip()
+            if name:
+                scripts.append(name)
+    return scripts
+
+
 def _load_toml(path):
     if tomllib is None:
         logger.warning(
@@ -63,6 +93,8 @@ def parse_pyproject(project_dir):
         'setup_requires': [],
         'tests_require': [],
         'extras_require': {},
+        'scripts': [],
+        'entry_points': {},
     }
 
     build_system = data.get('build-system') or {}
@@ -86,6 +118,7 @@ def parse_pyproject(project_dir):
             result['license'] = str(license_val)
     urls = project.get('urls') or {}
     if isinstance(urls, dict):
+        result['project_urls'] = urls
         result['url'] = (urls.get('Homepage') or urls.get('homepage') or
                          urls.get('Source') or urls.get('Repository') or '')
     for req in project.get('dependencies') or []:
@@ -105,6 +138,13 @@ def parse_pyproject(project_dir):
             if extra in ('test', 'tests', 'testing', 'check', 'dev'):
                 result['tests_require'].extend(extras[extra])
         result['extras_require'] = extras
+
+    scripts = []
+    scripts.extend(_collect_script_names(project.get('scripts') or {}))
+    project_entry_points = project.get('entry-points') or {}
+    result['entry_points'] = project_entry_points if isinstance(
+        project_entry_points, dict) else {}
+    scripts.extend(_extract_console_scripts(result['entry_points']))
 
     # Poetry fallback
     poetry = (data.get('tool') or {}).get('poetry') or {}
@@ -136,6 +176,9 @@ def parse_pyproject(project_dir):
                 cleaned = _strip_req(req)
                 if cleaned:
                     result['install_requires'].append(cleaned)
+        scripts.extend(_collect_script_names(poetry.get('scripts') or {}))
+
+    result['scripts'] = sorted(set(scripts))
 
     return result
 
@@ -158,6 +201,8 @@ def parse_setup_cfg(project_dir):
         'setup_requires': [],
         'tests_require': [],
         'extras_require': {},
+        'scripts': [],
+        'entry_points': {},
     }
 
     if parser.has_section('metadata'):
@@ -197,6 +242,19 @@ def parse_setup_cfg(project_dir):
             if extra in ('test', 'tests', 'testing', 'check', 'dev'):
                 result['tests_require'].extend(extras[extra])
     result['extras_require'] = extras
+
+    if parser.has_section('options.entry_points'):
+        entry_points = {}
+        for key, value in parser.items('options.entry_points'):
+            lines = []
+            for line in (value or '').splitlines():
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    lines.append(line)
+            entry_points[key] = lines
+        result['entry_points'] = entry_points
+        result['scripts'] = sorted(set(_extract_console_scripts(entry_points)))
+
     return result
 
 
@@ -225,6 +283,8 @@ def parse_setup_py(project_dir):
         'setup_requires': [],
         'tests_require': [],
         'extras_require': {},
+        'scripts': [],
+        'entry_points': {},
     }
 
     # Collect simple module-level assignments: name = <literal>
@@ -281,6 +341,17 @@ def parse_setup_py(project_dir):
                     result['tests_require'].extend(parsed[extra])
         result['extras_require'] = parsed
 
+    scripts = keywords.get('scripts')
+    if isinstance(scripts, (list, tuple)):
+        result['scripts'] = [os.path.basename(str(s))
+                             for s in scripts if isinstance(s, str) and s]
+
+    entry_points = keywords.get('entry_points')
+    if isinstance(entry_points, dict):
+        result['entry_points'] = entry_points
+        result['scripts'] = sorted(set(
+            result['scripts'] + _extract_console_scripts(entry_points)))
+
     # Fallback regex for simple assignments if AST literals failed
     if not result.get('name'):
         match = re.search(
@@ -293,6 +364,7 @@ def parse_setup_py(project_dir):
         if match:
             result['version'] = match.group(1)
 
+    result['scripts'] = sorted(set(result.get('scripts') or []))
     return result
 
 
@@ -307,6 +379,7 @@ def merge_metadata(*parts):
         'py_modules': [],
         'scripts': [],
         'entry_points': {},
+        'project_urls': {},
         'classifiers': [],
         'test_suite': None,
         'description': '',
@@ -324,6 +397,8 @@ def merge_metadata(*parts):
                         merged[key].append(item)
             elif key == 'extras_require' and isinstance(value, dict):
                 merged['extras_require'].update(value)
+            elif key == 'project_urls' and isinstance(value, dict):
+                merged['project_urls'].update(value)
             elif key in merged and not merged.get(key) and value:
                 merged[key] = value
             elif key not in merged and value:

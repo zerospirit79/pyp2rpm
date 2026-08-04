@@ -115,6 +115,9 @@ popd
 {%- for script in data.scripts %}
 %{_bindir}/{{ script }}
 {%- endfor %}
+{%- for man_file in data.man_files %}
+{{ man_file }}
+{%- endfor %}
 {%- endif %}
 {%- if data.py_modules %}
 {%- for module in data.py_modules -%}

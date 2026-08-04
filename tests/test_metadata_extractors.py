@@ -219,6 +219,34 @@ stripped.  for example:  ::      [nosetests]     warningfilters=default
     def test_cut_to_length(self, text, length, delim, expected):
         assert me.cut_to_length(text, length, delim) == expected
 
+    @pytest.mark.parametrize(('paths', 'expected'), [
+        (['pkg-1.0/man/man1/displayctl.1'],
+         ['%{_mandir}/man1/displayctl.1*']),
+        (['pkg-1.0/man/man5/displayctl.conf.5.gz'],
+         ['%{_mandir}/man5/displayctl.conf.5*']),
+        (['pkg-1.0/docs/README.md'], []),
+    ])
+    def test_man_file_entries(self, paths, expected):
+        assert me.man_file_entries(paths) == expected
+
+    def test_pypi_and_vcs_urls(self):
+        assert me.pypi_project_url('displayctl') == 'https://pypi.org/project/displayctl/'
+        assert me.github_vcs_url('https://github.com/example/displayctl') == \
+            'https://github.com/example/displayctl'
+        assert me.github_vcs_url(
+            'https://example.org/project',
+            {'Source': 'https://github.com/example/displayctl.git'}) == \
+            'https://github.com/example/displayctl.git'
+
+    @pytest.mark.parametrize(('classifiers', 'expected'), [
+        (['Topic :: Internet :: WWW/HTTP'], 'Networking/WWW'),
+        (['Topic :: Office/Business'], 'Office'),
+        (['Topic :: Security'], 'Security/Networking'),
+        (['Topic :: Unknown'], 'Development/Python3'),
+    ])
+    def test_group_from_classifiers(self, classifiers, expected):
+        assert me.group_from_classifiers(classifiers) == expected
+
     @pytest.mark.parametrize(('i', 'expected'), [
         (0, False),
         (1, True),

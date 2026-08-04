@@ -73,3 +73,29 @@ def test_parse_pyproject_dependencies(tmp_path):
     assert meta['version'] == '1.2.3'
     assert 'click' in meta['install_requires']
     assert 'setuptools' in meta['setup_requires']
+
+
+def test_parse_pyproject_collects_scripts(tmp_path):
+    pyproject = tmp_path / 'pyproject.toml'
+    pyproject.write_text(
+        '[project]\n'
+        'name = "displayctl"\n'
+        'version = "0.1.0"\n'
+        'dependencies = ["click"]\n'
+        '\n'
+        '[project.scripts]\n'
+        'displayctl = "displayctl.cli:main"\n'
+        '\n'
+        '[project.entry-points.console_scripts]\n'
+        'displayctl-helper = "displayctl.cli:helper"\n'
+        '\n'
+        '[tool.poetry]\n'
+        'name = "displayctl"\n'
+        '\n'
+        '[tool.poetry.scripts]\n'
+        'displayctl-poetry = "displayctl.cli:poetry_main"\n',
+        encoding='utf-8')
+    meta = parse_pyproject(str(tmp_path))
+    assert 'displayctl' in meta['scripts']
+    assert 'displayctl-helper' in meta['scripts']
+    assert 'displayctl-poetry' in meta['scripts']

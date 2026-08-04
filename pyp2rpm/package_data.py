@@ -42,7 +42,7 @@ class PackageData(object):
         elif name == 'changelog_date_packager':
             return self.get_changelog_date_packager()
         elif name in ['runtime_deps', 'build_deps', 'classifiers',
-                      'doc_files', 'doc_license']:
+                      'doc_files', 'doc_license', 'man_files']:
             return self.data.get(name, [])
         elif name in ['packages', 'py_modules', 'scripts']:
             return self.data.get(name, [])
