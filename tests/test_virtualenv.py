@@ -1,4 +1,5 @@
 import os
+import errno
 import pytest
 import shutil
 import sys
@@ -13,6 +14,7 @@ except ImportError:
     VirtualEnv = None
 from pyp2rpm.name_convertor import NameConvertor
 from pyp2rpm.settings import DEFAULT_DISTRO, DEFAULT_PYTHON_VERSION
+from pyp2rpm.exceptions import VirtualenvFailException
 
 pytestmark = pytest.mark.skipif(VirtualEnv is None,
                                 reason="virtualenv-api not installed")
@@ -120,3 +122,25 @@ class TestVirtualEnv(object):
                  self.venv.data['py_modules'],
                  self.venv.data['scripts'],
                  self.venv.data['has_pth']) == expected)
+
+
+def test_virtualenv_missing_executable_raises_virtualenv_fail(tmp_path):
+    from pyp2rpm import virtualenv as venv_module
+
+    class BrokenVirtualEnvironment(object):
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def open_or_create(self):
+            raise OSError(errno.ENOENT, 'No such file or directory', 'virtualenv')
+
+    original = venv_module.VirtualEnvironment
+    venv_module.VirtualEnvironment = BrokenVirtualEnvironment
+    try:
+        with pytest.raises(VirtualenvFailException):
+            VirtualEnv(name='dummy.tar.gz',
+                       temp_dir=str(tmp_path),
+                       name_convertor=NameConvertor(DEFAULT_DISTRO),
+                       base_python_version=DEFAULT_PYTHON_VERSION)
+    finally:
+        venv_module.VirtualEnvironment = original

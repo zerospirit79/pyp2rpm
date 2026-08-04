@@ -2,6 +2,7 @@ import os
 import glob
 import logging
 import pprint
+import errno
 
 from virtualenvapi.manage import VirtualEnvironment
 import virtualenvapi.exceptions as ve
@@ -71,6 +72,12 @@ class VirtualEnv(object):
                                       python=python_version)
         try:
             self.env.open_or_create()
+        except OSError as e:
+            if getattr(e, 'errno', None) != errno.ENOENT:
+                raise
+            raise VirtualenvFailException(
+                'virtualenv executable is missing; skipping virtualenv '
+                'metadata extraction')
         except (ve.VirtualenvCreationException,
                 ve.VirtualenvReadonlyException):
             raise VirtualenvFailException('Failed to create virtualenv')
