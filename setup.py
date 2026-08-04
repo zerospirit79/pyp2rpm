@@ -40,9 +40,13 @@ setup(
     description="Convert Python packages to RPM SPECFILES",
     long_description=description,
     keywords='pypi, rpm, spec, specfile, convert',
-    author='Bohuslav "Slavek" Kabrda, Robert Kuska, Michal Cyprian, Iryna Shcherbina',
-    author_email='bkabrda@redhat.com, rkuska@redhat.com, mcyprian@redhat.com, ishcherb@redhat.com',
-    url='https://github.com/fedora-python/pyp2rpm',
+    author=('Bohuslav "Slavek" Kabrda, Robert Kuska, Michal Cyprian, '
+            'Iryna Shcherbina, Pavel Shilov'),
+    author_email=('bkabrda@redhat.com, rkuska@redhat.com, mcyprian@redhat.com, '
+                  'ishcherb@redhat.com, zerospirit@altlinux.org'),
+    maintainer='Pavel Shilov',
+    maintainer_email='zerospirit@altlinux.org',
+    url='https://github.com/zerospirit79/pyp2rpm',
     license='MIT',
     packages=['pyp2rpm', 'pyp2rpm.command'],
     package_data={'pyp2rpm': ['templates/*.spec']},

@@ -1,6 +1,7 @@
 exclude .git*
 exclude .git*/**
 include CHANGELOG
+include CHANGELOG.md
 include LICENSE
 include README.md
 include pyp2rpm/templates/*
