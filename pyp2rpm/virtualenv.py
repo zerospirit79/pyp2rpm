@@ -81,6 +81,9 @@ class VirtualEnv(object):
         except (ve.VirtualenvCreationException,
                 ve.VirtualenvReadonlyException):
             raise VirtualenvFailException('Failed to create virtualenv')
+        except BaseException as e:
+            raise VirtualenvFailException(
+                'Unexpected virtualenv initialization failure: {0}'.format(e))
         self.dirs_before_install = DirsContent()
         self.dirs_after_install = DirsContent()
         self.dirs_before_install.fill(temp_dir + '/venv/')

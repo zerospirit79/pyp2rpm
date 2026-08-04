@@ -250,6 +250,10 @@ def venv_metadata_extension(extraction_fce):
         except exc.VirtualenvFailException as e:
             logger.error("{}, skipping virtualenv metadata extraction.".format(
                 e))
+        except BaseException as e:
+            logger.error(
+                "Virtualenv metadata extraction failed with unexpected "
+                "error ({0}), skipping.".format(e))
         finally:
             shutil.rmtree(temp_dir)
         return data
