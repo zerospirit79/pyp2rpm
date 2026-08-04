@@ -50,11 +50,20 @@ class RpmVersion():
             self.version.pop()
         rpm_version = '.'.join(str(x) for x in self.version)
         if self.pre:
-            rpm_suffix = '~{}'.format(''.join(str(x) for x in self.pre))
+            if isinstance(self.pre, (list, tuple)):
+                rpm_suffix = '~{}'.format(''.join(str(x) for x in self.pre))
+            else:
+                rpm_suffix = '~{}'.format(self.pre)
         elif self.dev:
-            rpm_suffix = '~~{}'.format(''.join(str(x) for x in self.dev))
+            if isinstance(self.dev, (list, tuple)):
+                rpm_suffix = '~~{}'.format(''.join(str(x) for x in self.dev))
+            else:
+                rpm_suffix = '~~dev{}'.format(self.dev)
         elif self.post:
-            rpm_suffix = '^post{}'.format(self.post[1])
+            if isinstance(self.post, (list, tuple)):
+                rpm_suffix = '^post{}'.format(self.post[1])
+            else:
+                rpm_suffix = '^post{}'.format(self.post)
         else:
             rpm_suffix = ''
         return '{}{}{}'.format(rpm_epoch, rpm_version, rpm_suffix)

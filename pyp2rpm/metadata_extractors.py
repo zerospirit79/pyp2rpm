@@ -147,12 +147,14 @@ KNOWN_RPM_GROUPS = set([
 
 
 def pypi_project_url(name):
+    if not isinstance(name, str) or not name:
+        return 'https://pypi.org/project/'
     return 'https://pypi.org/project/{0}/'.format(name)
 
 
 def github_vcs_url(home_page='', extra_urls=None):
     candidates = []
-    if home_page:
+    if isinstance(home_page, str) and home_page:
         candidates.append(home_page)
     if isinstance(extra_urls, dict):
         candidates.extend([v for v in extra_urls.values() if isinstance(v, str)])
@@ -164,7 +166,13 @@ def github_vcs_url(home_page='', extra_urls=None):
 
 
 def group_from_classifiers(classifiers):
-    text = ' '.join(classifiers or []).lower()
+    if isinstance(classifiers, str):
+        values = [classifiers]
+    elif isinstance(classifiers, (list, tuple, set)):
+        values = [c for c in classifiers if isinstance(c, str)]
+    else:
+        values = []
+    text = ' '.join(values).lower()
     rules = [
         ('topic :: internet :: www/http', 'Networking/WWW'),
         ('topic :: internet', 'Networking/Other'),
@@ -636,7 +644,7 @@ class SetupPyMetadataExtractor(LocalMetadataExtractor):
     @property
     def man_files(self):
         discovered = []
-        for path in self.archive.files:
+        for path in self.archive.get_files_re(r'.*', full_path=True):
             lower = path.lower()
             if '/man' not in lower:
                 continue
