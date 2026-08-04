@@ -8,7 +8,8 @@ import pytest
 from flexmock import flexmock
 
 from pyp2rpm.convertor import PyPIClient
-from pyp2rpm.package_getters import LocalFileGetter, PypiDownloader, get_url
+from pyp2rpm.package_getters import (
+    LocalFileGetter, LocalDirectoryGetter, PypiDownloader, get_url)
 from pyp2rpm.exceptions import MissingUrlException, NoSuchPackageException
 
 tests_dir = os.path.split(os.path.abspath(__file__))[0]
@@ -174,3 +175,21 @@ class TestLocalFileGetter(object):
             self.td_dir, 'Sphinx-1.1.3-py2.6.egg'))
         assert not os.path.exists(os.path.join(tmpdir,
                                                'Sphinx-1.1.3-py2.6.egg'))
+
+
+class TestLocalDirectoryGetter(object):
+    td_dir = '{0}/test_data/'.format(tests_dir)
+
+    def test_get_returns_directory_and_parses_name_version(self):
+        project = os.path.join(self.td_dir, 'utest')
+        getter = LocalDirectoryGetter(project)
+        assert getter.get() == os.path.abspath(project)
+        assert getter.get_name_version() == ('utest', '0.1.0')
+
+    def test_missing_project_metadata_raises(self):
+        empty = tempfile.mkdtemp()
+        try:
+            with pytest.raises(NoSuchPackageException):
+                LocalDirectoryGetter(empty)
+        finally:
+            shutil.rmtree(empty)

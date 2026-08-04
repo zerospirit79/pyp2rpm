@@ -7,7 +7,7 @@ from pyp2rpm.convertor import Convertor
 from pyp2rpm.exceptions import NoSuchPackageException
 from pyp2rpm.metadata_extractors import (SetupPyMetadataExtractor,
                                          WheelMetadataExtractor)
-from pyp2rpm.package_getters import PypiDownloader, LocalFileGetter
+from pyp2rpm.package_getters import PypiDownloader, LocalFileGetter, LocalDirectoryGetter
 from pyp2rpm.package_data import PackageData
 
 tests_dir = os.path.split(os.path.abspath(__file__))[0]
@@ -20,7 +20,8 @@ class TestConvertor(object):
 
     @pytest.mark.parametrize(('sf', 'g'), [
         ('spam', PypiDownloader),
-        ('{0}restsh-0.1.tar.gz'.format(td_dir), LocalFileGetter)
+        ('{0}restsh-0.1.tar.gz'.format(td_dir), LocalFileGetter),
+        ('{0}utest'.format(td_dir), LocalDirectoryGetter),
     ])
     def test_getter_good_data(self, sf, g):
         c = Convertor(package=sf)

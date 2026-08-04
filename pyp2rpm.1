@@ -5,13 +5,15 @@
 Tool which converts a package from PyPI to RPM specfile or SRPM.
 
 .SH SYNOPSIS
-.B mybin.py
-[\fI\,OPTIONS\/\fR] \fI\,PACKAGE\/\fR
+.B pyp2rpm
+[\fI\,OPTIONS\/\fR] [\fI\,PACKAGE\/\fR]
 
 
 .SH ARGUMENTS
 .B PACKAGE
-PyPI name of the package or path to compressed source file.
+PyPI name of the package, path to compressed source file, or path to a local
+project directory (with setup.py or pyproject.toml).
+Use \fB\-l\fR/\fB\-\-local\-dir\fR as an alternative for directories.
 
 .SH DESCRIPTION
 Tool convert Python package to RPM SPECFILES. The package can be download from PyPI or from the local filesystem and the produced SPEC is in line with Fedora packaging Guidelines or Mageia Python Policy.
@@ -50,6 +52,16 @@ Specify where to save package file, specfile and generated SRPM (default: "~/rpm
 .TP
 .B "\-v \-\-VERSION"
 Version of the package to download (ignored for local files).
+.TP
+.B "\-l, \-\-local\-dir DIRECTORY"
+Path to a local project directory containing setup.py, setup.cfg or
+pyproject.toml. Metadata is read from these files without building an sdist
+(alternative to PACKAGE). With the altlinux template, dependencies are checked
+against Sisyphus via RDB API; missing packages are listed after conversion.
+.TP
+.B "\-\-spec SPEC_FILE"
+Path to an existing SPEC file. Discovered dependencies are inserted into this
+file in place instead of rendering a new SPEC from a template.
 .TP
 .B "\--venv / --no-venv \"
 Enable / disable metadata extraction from virtualenv.

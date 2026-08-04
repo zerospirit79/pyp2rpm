@@ -246,3 +246,40 @@ class LocalFileGetter(PackageGetter):
     @property
     def name(self):
         return self.get_name_version()[0]
+
+
+class LocalDirectoryGetter(PackageGetter):
+    """Use an unpacked local project directory (no sdist build)."""
+
+    def __init__(self, local_dir, save_dir=None):
+        from pyp2rpm.local_project import read_project_metadata
+
+        self.project_dir = os.path.abspath(local_dir)
+        if not os.path.isdir(self.project_dir):
+            raise exceptions.NoSuchPackageException(
+                'Local project directory "{0}" does not exist.'.format(
+                    self.project_dir))
+
+        setup_py = os.path.join(self.project_dir, 'setup.py')
+        pyproject = os.path.join(self.project_dir, 'pyproject.toml')
+        setup_cfg = os.path.join(self.project_dir, 'setup.cfg')
+        if not any(os.path.isfile(p) for p in (setup_py, pyproject, setup_cfg)):
+            raise exceptions.NoSuchPackageException(
+                'Directory "{0}" does not contain setup.py, setup.cfg or '
+                'pyproject.toml.'.format(self.project_dir))
+
+        self.metadata = read_project_metadata(self.project_dir)
+        self.name = self.metadata.get('name') or os.path.basename(
+            self.project_dir.rstrip(os.sep)) or 'package'
+        self.version = self.metadata.get('version') or '0'
+        # save_dir is unused for directories but kept for API compatibility
+        self.save_dir = save_dir or settings.DEFAULT_PKG_SAVE_PATH
+
+    def get(self):
+        """Return the project directory path (sources stay in place)."""
+        logger.info('Using local project directory: {0}'.format(
+            self.project_dir))
+        return self.project_dir
+
+    def get_name_version(self):
+        return (self.name, self.version)

@@ -628,3 +628,211 @@ class WheelMetadataExtractor(LocalMetadataExtractor):
                 .get('python.details', {})
                 .get('document_names', {})
                 .values())
+
+
+class DirectoryMetadataExtractor(object):
+    """Extract metadata from an unpacked local project directory.
+
+    Reads ``pyproject.toml``, ``setup.cfg`` and ``setup.py`` without building
+    an sdist or installing the package.
+    """
+
+    def __init__(self, project_dir, name, name_convertor, version,
+                 rpm_name=None, venv=False, distro=None,
+                 base_python_version=None, metadata_extension=False):
+        from pyp2rpm.local_project import read_project_metadata
+
+        self.project_dir = os.path.abspath(project_dir)
+        self.local_file = self.project_dir
+        self.name = name
+        self.name_convertor = name_convertor
+        self.version = version
+        self.rpm_name = rpm_name
+        self.venv = False  # no archive to install into a venv
+        self.distro = distro
+        self.base_python_version = base_python_version
+        self.metadata_extension = metadata_extension
+        self.unsupported_version = None
+        self.metadata = read_project_metadata(self.project_dir)
+        # Prefer explicit name/version from getter when provided.
+        if name:
+            self.metadata['name'] = name
+        if version:
+            self.metadata['version'] = version
+
+    def name_convert_deps_list(self, deps_list):
+        for dep in deps_list:
+            dep[1] = self.name_convertor.rpm_name(
+                dep[1], self.base_python_version)
+        return deps_list
+
+    @property
+    def srcname(self):
+        if self.rpm_name or self.name.startswith(('python-', 'Python-')):
+            return self.name_convertor.base_name(self.rpm_name or self.name)
+
+    @property
+    def runtime_deps(self):
+        use_rich_deps = self.distro not in settings.RPM_RICH_DEP_BLACKLIST
+        install_requires = list(self.metadata.get('install_requires') or [])
+        if self.metadata.get('entry_points') and 'setuptools' not in install_requires:
+            install_requires.append('setuptools')
+        return sorted(self.name_convert_deps_list(deps_from_pyp_format(
+            install_requires, runtime=True, use_rich_deps=use_rich_deps)))
+
+    @property
+    def build_deps(self):
+        use_rich_deps = self.distro not in settings.RPM_RICH_DEP_BLACKLIST
+        build_requires = list(self.metadata.get('setup_requires') or [])
+        if self.has_test_suite:
+            build_requires += list(self.metadata.get('tests_require') or [])
+            build_requires += list(self.metadata.get('install_requires') or [])
+        else:
+            # Runtime deps are still needed at build/check time for ALT.
+            build_requires += list(self.metadata.get('install_requires') or [])
+        if 'setuptools' not in build_requires:
+            build_requires.append('setuptools')
+        # unique preserve order
+        unique = []
+        for req in build_requires:
+            if req not in unique:
+                unique.append(req)
+        return sorted(self.name_convert_deps_list(deps_from_pyp_format(
+            unique, runtime=False, use_rich_deps=use_rich_deps)))
+
+    @property
+    def has_test_suite(self):
+        if self.metadata.get('tests_require'):
+            return True
+        if self.metadata.get('test_suite'):
+            return True
+        for root, dirs, files in os.walk(self.project_dir):
+            dirs[:] = [d for d in dirs if d not in
+                       ('.git', '.tox', '.venv', 'venv', '__pycache__',
+                        '.eggs', 'dist', 'build')]
+            for name in files:
+                if name.startswith('test_') and name.endswith('.py'):
+                    return True
+                if name.endswith('_test.py'):
+                    return True
+            if os.path.basename(root) in ('tests', 'test') and files:
+                return True
+        return False
+
+    @property
+    def has_extension(self):
+        for root, dirs, files in os.walk(self.project_dir):
+            dirs[:] = [d for d in dirs if d not in
+                       ('.git', '.tox', '.venv', 'venv', '__pycache__')]
+            for name in files:
+                if any(name.endswith(suf) for suf in settings.EXTENSION_SUFFIXES):
+                    return True
+        return False
+
+    @property
+    def py_modules(self):
+        return sorted(set(self.metadata.get('py_modules') or []))
+
+    @property
+    def packages(self):
+        packages = self.metadata.get('packages') or set()
+        if isinstance(packages, (list, tuple, set)):
+            return sorted({p.split('.', 1)[0] for p in packages})
+        return []
+
+    @property
+    def has_packages(self):
+        return bool(self.packages)
+
+    @property
+    def scripts(self):
+        return sorted(set(self.metadata.get('scripts') or []))
+
+    @property
+    def home_page(self):
+        return self.metadata.get('url') or ''
+
+    @property
+    @process_description
+    def description(self):
+        text = self.metadata.get('long_description') or self.metadata.get(
+            'description') or ''
+        return cut_to_length(text, 80 * 8, '\n')
+
+    @property
+    @process_description
+    def summary(self):
+        text = (self.metadata.get('description') or '').split('\n')[0]
+        return cut_to_length(text, 50, '.')
+
+    @property
+    def classifiers(self):
+        return self.metadata.get('classifiers') or []
+
+    @property
+    def license(self):
+        return self.metadata.get('license') or license_from_trove(self.classifiers)
+
+    @property
+    def doc_files(self):
+        found = []
+        for entry in os.listdir(self.project_dir):
+            path = os.path.join(self.project_dir, entry)
+            if not os.path.isfile(path):
+                continue
+            lower = entry.lower()
+            if any(re.match(pat, lower) for pat in settings.DOC_FILES_RE):
+                found.append(entry)
+        return found
+
+    @property
+    def sphinx_dir(self):
+        for candidate in ('doc', 'docs'):
+            path = os.path.join(self.project_dir, candidate)
+            if os.path.isfile(os.path.join(path, 'conf.py')):
+                return candidate
+        return None
+
+    def extract_data(self, client=None):
+        data = PackageData(
+            local_file=self.local_file,
+            name=self.name,
+            pkg_name=self.rpm_name or self.name_convertor.rpm_name(
+                self.name, pkg_name=True),
+            version=self.version,
+            srcname=self.srcname)
+
+        archive_data = {
+            'runtime_deps': self.runtime_deps,
+            'build_deps': list(self.build_deps) if self.distro == 'altlinux' else (
+                [['BuildRequires', 'python2-devel', '{name}']] + self.build_deps),
+            'py_modules': self.py_modules,
+            'scripts': self.scripts,
+            'home_page': self.home_page,
+            'description': self.description,
+            'summary': self.summary,
+            'license': self.license,
+            'has_pth': False,
+            'has_extension': self.has_extension,
+            'has_test_suite': self.has_test_suite,
+            'python_versions': versions_from_trove(self.classifiers) or ['3'],
+            'doc_files': [d for d in self.doc_files
+                          if all(s not in d.lower()
+                                 for s in settings.LICENSE_FILES)],
+            'doc_license': [d for d in self.doc_files
+                            if any(s in d.lower()
+                                   for s in settings.LICENSE_FILES)],
+            'dirname': os.path.basename(self.project_dir.rstrip(os.sep)),
+            'source0': os.path.basename(self.project_dir.rstrip(os.sep)),
+            'has_packages': self.has_packages,
+            'packages': self.packages,
+            'has_bundled_egg_info': False,
+        }
+        sphinx_dir = self.sphinx_dir
+        if sphinx_dir:
+            archive_data['sphinx_dir'] = sphinx_dir
+            archive_data['build_deps'].append(
+                ['BuildRequires', self.name_convertor.rpm_name(
+                    'sphinx', self.base_python_version), '{name}'])
+        data.set_from(archive_data)
+        return data

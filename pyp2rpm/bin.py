@@ -171,24 +171,65 @@ class SclizeOption(click.Option):
               'the prefix part is optional.',
               default=None,
               metavar='FILE_NAME')
-@click.argument('package', nargs=1)
-def main(package, v, prerelease, d, s, r, proxy, srpm, p, b, o, t, venv, autonc,
-         sclize, **scl_kwargs):
+@click.option('-l', '--local-dir',
+              help='Path to a local project directory containing setup.py, '
+              'setup.cfg or pyproject.toml. Metadata and dependencies are '
+              'read from these files without building an sdist (alternative '
+              'to PACKAGE; a directory can also be passed as PACKAGE). For '
+              'altlinux template, BuildRequires are checked against Sisyphus '
+              'via RDB API; packages absent in Sisyphus are listed after '
+              'conversion.',
+              type=click.Path(exists=True, file_okay=False, dir_okay=True,
+                              resolve_path=True),
+              default=None,
+              metavar='DIRECTORY')
+@click.option('--spec',
+              help='Path to an existing SPEC file to update in place. '
+              'Discovered BuildRequires/Requires (present in Sisyphus for '
+              'altlinux) are inserted into this file instead of rendering a '
+              'new SPEC from a template.',
+              type=click.Path(exists=True, file_okay=True, dir_okay=False,
+                              resolve_path=True),
+              default=None,
+              metavar='SPEC_FILE')
+@click.argument('package', required=False, default=None)
+def main(package, local_dir, spec, v, prerelease, d, s, r, proxy, srpm, p, b, o,
+         t, venv, autonc, sclize, **scl_kwargs):
     """Convert PyPI package to RPM specfile or SRPM.
 
     \b
     \b\bArguments:
-    PACKAGE             Provide PyPI name of the package or path to compressed
-                        source file.
+    PACKAGE             Provide PyPI name of the package, path to compressed
+                        source file, or path to a local project directory.
+                        Use -l/--local-dir as an alternative for directories.
+                        Local directories are not built; dependencies are taken
+                        from pyproject.toml / setup.cfg / setup.py.
+                        Use --spec to update an existing SPEC file in place.
     """
     register_file_log_handler('/tmp/pyp2rpm-{0}.log'.format(getpass.getuser()))
 
     if srpm or s:
         register_console_log_handler()
 
+    if local_dir and package:
+        raise click.UsageError(
+            'Provide either PACKAGE or --local-dir, not both.')
+    if local_dir:
+        package = local_dir
+    if not package:
+        raise click.UsageError(
+            'Provide PACKAGE (PyPI name, archive path, or project directory) '
+            'or --local-dir DIRECTORY.')
+    if spec and (srpm or s):
+        raise click.UsageError(
+            '--spec cannot be combined with -s/--srpm; it updates the given '
+            'SPEC file in place.')
+
     distro = o
-    if t and os.path.splitext(t)[0] in settings.KNOWN_DISTROS:
-        distro = t
+    template = t or settings.DEFAULT_TEMPLATE
+    template_base = os.path.splitext(template)[0]
+    if template_base in settings.KNOWN_DISTROS:
+        distro = template_base
     if not distro and not (b or p):
         raise click.UsageError("Default python versions for template {0} are "
                                "missing in settings, add them or use flags "
@@ -202,7 +243,7 @@ def main(package, v, prerelease, d, s, r, proxy, srpm, p, b, o, t, venv, autonc,
                           version=v,
                           prerelease=prerelease,
                           save_dir=d,
-                          template=t or settings.DEFAULT_TEMPLATE,
+                          template=template,
                           distro=distro,
                           base_python_version=b,
                           python_versions=p,
@@ -213,56 +254,79 @@ def main(package, v, prerelease, d, s, r, proxy, srpm, p, b, o, t, venv, autonc,
 
     logger.debug(
         'Convertor: {0} created. Trying to convert.'.format(convertor))
-    converted = convertor.convert()
-    logger.debug('Convertor: {0} succesfully converted.'.format(convertor))
 
-    if sclize:
-        converted = convert_to_scl(converted, scl_kwargs)
-
-    if srpm or s:
-        if r:
-            spec_name = r + '.spec'
+    if spec:
+        from pyp2rpm.spec_updater import update_spec_file
+        data = convertor.extract_package_data()
+        added = update_spec_file(
+            spec,
+            build_deps=getattr(data, 'build_deps', []),
+            runtime_deps=getattr(data, 'runtime_deps', []))
+        if added:
+            click.echo('Updated {0}:'.format(spec), err=True)
+            for line in added:
+                click.echo('  + {0}'.format(line), err=True)
         else:
-            prefix = 'python-' if not convertor.name.startswith(
-                'python-') else ''
-            spec_name = prefix + convertor.name + '.spec'
-        logger.info('Using name: {0} for specfile.'.format(spec_name))
-        if d == settings.DEFAULT_PKG_SAVE_PATH:
-            # default save_path is rpmbuild tree so we want to save spec
-            # in  rpmbuild/SPECS/
-            spec_path = d + '/SPECS/' + spec_name
-        else:
-            # if user provide save_path then save spec in provided path
-            spec_path = d + '/' + spec_name
-        spec_dir = os.path.dirname(spec_path)
-        if not os.path.exists(spec_dir):
-            os.makedirs(spec_dir)
-        logger.debug('Opening specfile: {0}.'.format(spec_path))
-
-        if not utils.PY3:
-            converted = converted.encode('utf-8')
-        with open(spec_path, 'w') as f:
-            f.write(converted)
-            logger.info('Specfile saved at: {0}.'.format(spec_path))
-
-        if srpm:
-            msg = utils.build_srpm(spec_path, d)
-            if isinstance(msg, bytes):
-                for line in msg.decode(locale.getpreferredencoding(),
-                                       errors='replace').split('\n'):
-                    logger.info('rpmbuild -bs: {}'.format(line))
-            else:
-                # As in python 3.4 and 3.5:
-                for line in msg.split('\n'):
-                    logger.info('rpmbuild -bs: {}'.format(line))
-
+            click.echo(
+                'No new dependencies to add to {0}.'.format(spec), err=True)
     else:
-        logger.debug('Printing specfile to stdout.')
-        if utils.PY3:
-            print(converted)
+        converted = convertor.convert()
+        logger.debug('Convertor: {0} succesfully converted.'.format(convertor))
+
+        if sclize:
+            converted = convert_to_scl(converted, scl_kwargs)
+
+        if srpm or s:
+            if r:
+                spec_name = r + '.spec'
+            else:
+                prefix = 'python-' if not convertor.name.startswith(
+                    'python-') else ''
+                spec_name = prefix + convertor.name + '.spec'
+            logger.info('Using name: {0} for specfile.'.format(spec_name))
+            if d == settings.DEFAULT_PKG_SAVE_PATH:
+                # default save_path is rpmbuild tree so we want to save spec
+                # in  rpmbuild/SPECS/
+                spec_path = d + '/SPECS/' + spec_name
+            else:
+                # if user provide save_path then save spec in provided path
+                spec_path = d + '/' + spec_name
+            spec_dir = os.path.dirname(spec_path)
+            if not os.path.exists(spec_dir):
+                os.makedirs(spec_dir)
+            logger.debug('Opening specfile: {0}.'.format(spec_path))
+
+            if not utils.PY3:
+                converted = converted.encode('utf-8')
+            with open(spec_path, 'w') as f:
+                f.write(converted)
+                logger.info('Specfile saved at: {0}.'.format(spec_path))
+
+            if srpm:
+                msg = utils.build_srpm(spec_path, d)
+                if isinstance(msg, bytes):
+                    for line in msg.decode(locale.getpreferredencoding(),
+                                           errors='replace').split('\n'):
+                        logger.info('rpmbuild -bs: {}'.format(line))
+                else:
+                    # As in python 3.4 and 3.5:
+                    for line in msg.split('\n'):
+                        logger.info('rpmbuild -bs: {}'.format(line))
+
         else:
-            print(converted.encode('utf-8'))
-        logger.debug('Specfile printed.')
+            logger.debug('Printing specfile to stdout.')
+            if utils.PY3:
+                print(converted)
+            else:
+                print(converted.encode('utf-8'))
+            logger.debug('Specfile printed.')
+
+    if getattr(convertor, 'missing_deps', None):
+        click.echo(
+            '\nDependencies not found in Sisyphus:', err=True)
+        for dep in convertor.missing_deps:
+            click.echo('  - {0}'.format(dep), err=True)
+
     logger.info("That's all folks!")
 
 

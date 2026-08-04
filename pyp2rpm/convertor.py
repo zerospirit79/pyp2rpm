@@ -63,11 +63,21 @@ class Convertor(object):
         self.venv = venv
         self.autonc = autonc
         self.pypi = True
-        suffix = os.path.splitext(self.package)[1]
-        if (os.path.exists(self.package)
-                and suffix in settings.ARCHIVE_SUFFIXES
-                and not os.path.isdir(self.package)):
+        self.from_directory = False
+        self.missing_deps = []
+        if os.path.isdir(self.package):
             self.pypi = False
+            self.from_directory = True
+        else:
+            suffix = os.path.splitext(self.package)[1]
+            if (os.path.exists(self.package)
+                    and suffix in settings.ARCHIVE_SUFFIXES):
+                self.pypi = False
+
+        # Template name implies distro rules when it is a known distro.
+        template_base = os.path.splitext(self.template)[0]
+        if template_base in settings.KNOWN_DISTROS:
+            self.distro = template_base
 
     @property
     def template_base_py_ver(self):
@@ -125,12 +135,12 @@ class Convertor(object):
         data.base_python_version = base_version
         data.python_versions = additional_versions
 
-    def convert(self):
-        """Returns RPM SPECFILE.
+    def extract_package_data(self):
+        """Download/locate package and extract metadata (no SPEC render).
+
         Returns:
-            rendered RPM SPECFILE.
+            PackageData with dependencies possibly filtered for Sisyphus.
         """
-        # move file into position
         try:
             local_file = self.getter.get()
         except (exceptions.NoSuchPackageException, OSError) as e:
@@ -140,14 +150,41 @@ class Convertor(object):
 
             sys.exit(e)
 
-        # save name and version from the file (rewrite if set previously)
         self.name, self.version = self.getter.get_name_version()
-
         self.local_file = local_file
         data = self.metadata_extractor.extract_data(self.client)
         logger.debug("Extracted metadata:")
         logger.debug(pprint.pformat(data.data))
         self.merge_versions(data)
+
+        if self.distro == 'altlinux':
+            from pyp2rpm import sisyphus
+            build_kept, build_missing = sisyphus.filter_deps(
+                getattr(data, 'build_deps', []))
+            runtime_kept, runtime_missing = sisyphus.filter_deps(
+                getattr(data, 'runtime_deps', []))
+            data.build_deps = build_kept
+            data.runtime_deps = runtime_kept
+            missing = []
+            seen = set()
+            for name in build_missing + runtime_missing:
+                if name not in seen:
+                    seen.add(name)
+                    missing.append(name)
+            self.missing_deps = missing
+            if missing:
+                logger.info('Dependencies missing in Sisyphus: {0}'.format(
+                    ', '.join(missing)))
+
+        self.data = data
+        return data
+
+    def convert(self):
+        """Returns RPM SPECFILE.
+        Returns:
+            rendered RPM SPECFILE.
+        """
+        data = self.extract_package_data()
 
         jinja_env = jinja2.Environment(loader=jinja2.ChoiceLoader([
             jinja2.FileSystemLoader(['/']),
@@ -184,7 +221,13 @@ class Convertor(object):
             NoSuchPackageException if the package is unknown on PyPI
         """
         if not hasattr(self, '_getter'):
-            if not self.pypi:
+            if self.from_directory:
+                logger.debug(
+                    'Using local project directory: {0}.'.format(self.package))
+                self._getter = package_getters.LocalDirectoryGetter(
+                    self.package,
+                    self.save_dir)
+            elif not self.pypi:
                 self._getter = package_getters.LocalFileGetter(
                     self.package,
                     self.save_dir)
@@ -257,7 +300,11 @@ class Convertor(object):
             raise AttributeError("local_file attribute must be set before "
                                  "calling metadata_extractor")
         if not hasattr(self, '_metadata_extractor'):
-            if self.local_file.endswith('.whl'):
+            if self.from_directory:
+                logger.info("Getting metadata from local project directory "
+                            "using DirectoryMetadataExtractor.")
+                extractor_cls = metadata_extractors.DirectoryMetadataExtractor
+            elif self.local_file.endswith('.whl'):
                 logger.info("Getting metadata from wheel using "
                             "WheelMetadataExtractor.")
                 extractor_cls = metadata_extractors.WheelMetadataExtractor
@@ -285,8 +332,9 @@ class Convertor(object):
     def client(self):
         """JSON client for PyPI. Always returns the same instance.
 
-        If the package is provided as a path to compressed source file,
-        PyPI will not be used and the client will not be instantiated.
+        If the package is provided as a path to compressed source file
+        or a local project directory, PyPI will not be used and the client
+        will not be instantiated.
 
         Returns:
             JSON client for PyPI or None.

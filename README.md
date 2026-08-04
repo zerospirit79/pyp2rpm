@@ -24,19 +24,38 @@ pyp2rpm package_name --srpm
 
 This downloads the package from PyPI and creates a SRPM file.
 
+Or convert a local project directory (metadata is read from ``setup.py`` /
+``setup.cfg`` / ``pyproject.toml``; the project is **not** built):
+```sh
+pyp2rpm -l /path/to/project
+# same as:
+pyp2rpm /path/to/project
+```
+
+With the default ``altlinux`` template, dependencies found in those files are
+checked against Sisyphus (RDB API). Only packages present in Sisyphus are added
+to ``BuildRequires``/``Requires``; missing ones are printed after conversion.
+
+To update an existing SPEC instead of generating a new one:
+```sh
+pyp2rpm -l /path/to/project --spec /path/to/package.spec
+```
+
 All of the `pyp2rpm` options are:
 
     $ pyp2rpm -h
 
     usage: pyp2rpm [-h] [-v VERSION] [-d SAVE_DIR] [-r RPM_NAME]
                    [-t TEMPLATE] [-o DISTRO] [-b BASE_PYTHON]
-                   [-p PYTHON_VERSION] [--srpm] [--proxy PROXY] PACKAGE
+                   [-p PYTHON_VERSION] [-l DIRECTORY] [--srpm]
+                   [--proxy PROXY] [PACKAGE]
 
     Convert PyPI package to RPM specfile or SRPM.
 
     Arguments:
-      PACKAGE             Provide PyPI name of the package or path to compressed
-                          source file.
+      PACKAGE             Provide PyPI name of the package, path to compressed
+                          source file, or path to a local project directory.
+                          Use -l/--local-dir as an alternative for directories.
 
     Options:
       -t TEMPLATE                     Template file (jinja2 format) to render
@@ -66,6 +85,13 @@ All of the `pyp2rpm` options are:
                                       "/home/mcyprian/rpmbuild").
       -v VERSION                      Version of the package to download (ignored
                                       for local files).
+      -l, --local-dir DIRECTORY       Path to a local project directory containing
+                                      setup.py, setup.cfg or pyproject.toml.
+                                      Reads metadata without building an sdist
+                                      (alternative to PACKAGE). For altlinux,
+                                      deps are checked against Sisyphus.
+      --spec SPEC_FILE                Existing SPEC to update in place with
+                                      discovered BuildRequires/Requires.
       --venv / --no-venv              Enable / disable metadata extraction from
                                       virtualenv (default: enabled).
       --autonc / --no-autonc          Enable / disable using automatic provides
